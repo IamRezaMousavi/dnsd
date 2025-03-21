@@ -85,12 +85,12 @@ void UDPServer::run() {
       break;
     }
 
-    DNS dnspacket = parseDNS(buffer);
+    DNS dnspacket;
+    dnspacket.parseDNS(buffer);
     std::cout << dnspacket << std::endl;
 
-    // std::string response = "Reza";
-    // sendto(sockfd, response.c_str(), response.size(), 0,
-    //        (struct sockaddr *)&clientAddr, addr_len);
+    auto response = dnspacket.buildDNSResponse();
+    sendto(sockfd, response.data(), response.size(), 0, (struct sockaddr *)&clientAddr, addr_len);
   }
   close(sockfd);
   logger.info("UDP server is shutting down");
