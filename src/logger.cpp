@@ -3,9 +3,9 @@
 #include <ctime>
 #include <iostream>
 
-Logger &Logger::getLogger() {
-  static Logger logger;
-  return logger;
+Logger &Logger::getInstance() {
+  static Logger instance;
+  return instance;
 }
 
 void Logger::setLogLevel(Level level) {

@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 #include "argparser.hpp"
-#include "config.hpp"
+#include "db.hpp"
 #include "logger.hpp"
 #include "udpserver.hpp"
 
@@ -30,10 +30,10 @@ void signalHandler(int signum) {
 int main(int argc, char **argv) {
   ArgParser parser(APPNAME " " VERSION, "This is a simple dns server.");
 
-  std::string configFile = "db.conf";
-  int         port       = PORT;
+  std::string dbFile = "db.conf";
+  int         port   = PORT;
 
-  parser.add_option<std::string>("f", "file", "Zone file name", configFile);
+  parser.add_option<std::string>("f", "file", "Dns records file name", dbFile);
   parser.add_option<int>("p", "port", "Port to listening", port);
   parser.add_option<bool>("h", "help", "Show help message", false);
 
@@ -45,19 +45,20 @@ int main(int argc, char **argv) {
       exit(EXIT_SUCCESS);
     }
 
-    configFile = parser.get_value<std::string>("f");
-    port       = parser.get_value<int>("p");
+    dbFile = parser.get_value<std::string>("f");
+    port   = parser.get_value<int>("p");
 
   } catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << "\n";
     exit(EXIT_FAILURE);
   }
-  Logger &logger = Logger::getLogger();
+
+  Logger &logger = Logger::getInstance();
 
   server.setPort(port);
 
-  logger.info("Reading config file from " + configFile);
-  Config config(configFile);
+  logger.info("Reading db file from " + dbFile);
+  DB::getInstance(dbFile);
 
   std::signal(SIGINT, signalHandler);
 

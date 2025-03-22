@@ -411,11 +411,15 @@ private:
   DNSQuery    parseDNSQuery(const uint8_t *data, int &offset);
   DNSAnswer   parseDNSAnswer(const uint8_t *data, int &offset);
 
+  void createDNSAnswer();
+
   void appendDNSQuery(std::vector<uint8_t> &response, const DNSQuery &query);
   void appendDNSAnswer(std::vector<uint8_t> &response, const DNSAnswer &answer);
   void appendDNSName(std::vector<uint8_t> &response, const std::string &name);
   void appendUint16(std::vector<uint8_t> &response, uint16_t value);
   void appendUint32(std::vector<uint8_t> &response, uint32_t value);
 };
+
+std::string to_string(int value, std::unordered_map<int, std::string> values);
 
 #endif /* __DNS_HPP__ */

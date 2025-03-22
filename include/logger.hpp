@@ -12,7 +12,7 @@ public:
     ERROR,
   };
 
-  static Logger &getLogger();
+  static Logger &getInstance();
 
   void setLogLevel(Level level);
 

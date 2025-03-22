@@ -1,4 +1,4 @@
-#include "config.hpp"
+#include "db.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -9,13 +9,31 @@
 
 #include "logger.hpp"
 
+DB &DB::getInstance(std::string filename) {
+  static DB instance(filename);
+  return instance;
+}
+
+std::optional<DB::DNSRecord> DB::get(DNSQuery dnsquery) {
+  auto it = records.find(dnsquery.name);
+  if (it != records.end()) {
+    auto values = it->second;
+    for (auto &v : values)
+      if (v.type == to_string(dnsquery.type, dns_type_vals) && v.recordclass == to_string(dnsquery.qclass, dns_class_vals))
+        return v;
+
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
 inline std::string removeComment(const std::string &line) {
   size_t pos = line.find(';');
   return (pos != std::string::npos) ? line.substr(0, pos) : line;
 }
 
-Config::Config(std::string filename) {
-  Logger &logger = Logger::getLogger();
+DB::DB(std::string filename) {
+  Logger &logger = Logger::getInstance();
 
   std::string   line;
   std::ifstream configFile(filename);

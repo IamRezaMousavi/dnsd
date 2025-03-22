@@ -37,7 +37,7 @@ void UDPServer::setPort(int port) {
 }
 
 void UDPServer::run() {
-  Logger &logger = Logger::getLogger();
+  Logger &logger = Logger::getInstance();
 
   struct sockaddr_in serverAddr, clientAddr;
   socklen_t          addr_len = sizeof(clientAddr);

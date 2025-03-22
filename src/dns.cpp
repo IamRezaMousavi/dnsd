@@ -1,10 +1,13 @@
 #include "dns.hpp"
 
+#include <arpa/inet.h>
 #include <iomanip>
 #include <netinet/in.h>
 #include <sstream>
 
-inline std::string to_string(int value, std::unordered_map<int, std::string> values) {
+#include "db.hpp"
+
+std::string to_string(int value, std::unordered_map<int, std::string> values) {
   auto it = values.find(value);
   if (it != values.end()) {
     return it->second;
@@ -38,22 +41,24 @@ void DNS::parseDNS(const uint8_t *data) {
 std::vector<uint8_t> DNS::buildDNSResponse() {
   std::vector<uint8_t> response;
 
-  std::string rdata = "ns1.cloud99p.org";
-  appendDNSName(response, "ns1.cloud99p.org");
-
-  answers.push_back(
-      {.name = queries.front().name, .type = T_NS, .qclass = C_IN, .ttl = 86400, .rdlength = (uint16_t)response.size(), .rdata = response}
-  );
-
-  response.clear();
-
-  DNSHeader responseHeader;
+  DNSHeader responseHeader     = {};
   responseHeader.transactionId = htons(header.transactionId);
-  // responseHeader.flags         = htons(0x8500); // Standard response, no error
-  responseHeader.flags |= F_RESPONSE;
-  responseHeader.flags |= F_AUTHORITATIVE;
-  responseHeader.flags |= F_RECDESIRED;
-  responseHeader.flags = htons(responseHeader.flags);
+
+  createDNSAnswer();
+
+  if (answers.size() == 0) {
+    /* Standard query response, No such name */
+    responseHeader.flags |= F_RESPONSE;
+    responseHeader.flags |= (OPCODE_QUERY << OPCODE_SHIFT);
+    responseHeader.flags |= RCODE_NXDOMAIN;
+    responseHeader.flags = htons(responseHeader.flags);
+  } else {
+    /* Standard query response, No error */
+    responseHeader.flags |= F_RESPONSE;
+    responseHeader.flags |= (OPCODE_QUERY << OPCODE_SHIFT);
+    responseHeader.flags |= RCODE_NOERROR;
+    responseHeader.flags = htons(responseHeader.flags);
+  }
 
   responseHeader.qdcount = htons(header.qdcount);
   responseHeader.ancount = htons(answers.size());
@@ -115,6 +120,37 @@ DNSAnswer DNS::parseDNSAnswer(const uint8_t *data, int &offset) {
   return answer;
 }
 
+void DNS::createDNSAnswer() {
+  DB      &db             = DB::getInstance("");
+  DNSQuery query          = queries.at(0);
+  auto     returnedRecord = db.get(query);
+  if (!returnedRecord.has_value())
+    return;
+
+  auto record = *returnedRecord;
+  if (record.type == "A") {
+    DNSAnswer answer = {
+        .name = query.name, .type = query.type, .qclass = query.qclass, .ttl = 0, .rdlength = 4, .rdata = {192, 168, 1, 1}
+    };
+
+    if (record.ttl.has_value()) {
+      answer.ttl = *(record.ttl);
+    }
+
+    struct in_addr addr;
+    if (inet_pton(AF_INET, record.value.data(), &addr) != 1)
+      return;
+
+    answer.rdlength = sizeof(addr);
+    answer.rdata[0] = static_cast<uint8_t>(addr.s_addr & 0xFF);
+    answer.rdata[1] = static_cast<uint8_t>((addr.s_addr >> 8) & 0xFF);
+    answer.rdata[2] = static_cast<uint8_t>((addr.s_addr >> 16) & 0xFF);
+    answer.rdata[3] = static_cast<uint8_t>((addr.s_addr >> 24) & 0xFF);
+
+    answers.push_back(answer);
+  }
+}
+
 void DNS::appendDNSQuery(std::vector<uint8_t> &response, const DNSQuery &query) {
   appendDNSName(response, query.name);
   appendUint16(response, query.type);
@@ -162,6 +198,7 @@ std::ostream &operator<<(std::ostream &os, const DNSQuery &query) {
 }
 
 std::ostream &operator<<(std::ostream &os, const DNS &packet) {
+  os << "+------------------+-------------------+" << std::endl;
   os << "|                 DNS                  |" << std::endl;
   os << "+------------------+-------------------+" << std::endl;
   os << "|   Transaction ID | 0x" << std::left << std::setw(15) << std::hex << packet.header.transactionId << std::dec << " |" << std::endl;
