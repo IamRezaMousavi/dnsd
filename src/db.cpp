@@ -14,15 +14,10 @@ DB &DB::getInstance(std::string filename) {
   return instance;
 }
 
-std::optional<DB::DNSRecord> DB::get(DNSQuery dnsquery) {
-  auto it = records.find(dnsquery.name);
+std::optional<std::vector<DNSRecord>> DB::get(std::string name) {
+  auto it = records.find(name);
   if (it != records.end()) {
-    auto values = it->second;
-    for (auto &v : values)
-      if (v.type == to_string(dnsquery.type, dns_type_vals) && v.recordclass == to_string(dnsquery.qclass, dns_class_vals))
-        return v;
-
-    return std::nullopt;
+    return it->second;
   }
   return std::nullopt;
 }

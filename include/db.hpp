@@ -7,19 +7,17 @@
 #include <string>
 #include <vector>
 
-#include "dns.hpp"
+struct DNSRecord {
+  std::optional<uint32_t> ttl;
+  std::string             recordclass;
+  std::string             type;
+  std::string             value;
+};
 
 class DB {
 public:
-  struct DNSRecord {
-    std::optional<uint32_t> ttl;
-    std::string             recordclass;
-    std::string             type;
-    std::string             value;
-  };
-
-  static DB               &getInstance(std::string filename);
-  std::optional<DNSRecord> get(DNSQuery dnsquery);
+  static DB                            &getInstance(std::string filename);
+  std::optional<std::vector<DNSRecord>> get(std::string name);
 
 private:
   std::map<std::string, std::vector<DNSRecord>> records;

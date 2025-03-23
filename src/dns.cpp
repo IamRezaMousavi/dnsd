@@ -1,11 +1,19 @@
 #include "dns.hpp"
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <iomanip>
 #include <netinet/in.h>
 #include <sstream>
 
 #include "db.hpp"
+
+template<typename Cont, typename Pred>
+Cont filter(const Cont &container, Pred predicate) {
+  Cont result;
+  std::copy_if(container.begin(), container.end(), std::back_inserter(result), predicate);
+  return result;
+}
 
 std::string to_string(int value, std::unordered_map<int, std::string> values) {
   auto it = values.find(value);
@@ -123,31 +131,48 @@ DNSAnswer DNS::parseDNSAnswer(const uint8_t *data, int &offset) {
 void DNS::createDNSAnswer() {
   DB      &db             = DB::getInstance("");
   DNSQuery query          = queries.at(0);
-  auto     returnedRecord = db.get(query);
+  auto     returnedRecord = db.get(query.name);
   if (!returnedRecord.has_value())
     return;
 
-  auto record = *returnedRecord;
-  if (record.type == "A") {
-    DNSAnswer answer = {
-        .name = query.name, .type = query.type, .qclass = query.qclass, .ttl = 0, .rdlength = 4, .rdata = {192, 168, 1, 1}
-    };
+  switch (query.type) {
+    case T_A: {
+      auto records = filter(returnedRecord.value(), [](DNSRecord record) { return record.type == "A"; });
+      if (records.empty())
+        return;
 
-    if (record.ttl.has_value()) {
-      answer.ttl = *(record.ttl);
+      auto record = records.front();
+
+      DNSAnswer answer = {
+          .name     = query.name,
+          .type     = T_A,
+          .qclass   = query.qclass,
+          .ttl      = 0,
+          .rdlength = 4,
+          .rdata    = {192, 168, 1, 1}
+      };
+
+      if (record.ttl.has_value()) {
+        answer.ttl = record.ttl.value();
+      }
+
+      struct in_addr addr;
+      if (inet_pton(AF_INET, record.value.data(), &addr) != 1)
+        return;
+
+      answer.rdlength = sizeof(addr);
+      answer.rdata[0] = static_cast<uint8_t>(addr.s_addr & 0xFF);
+      answer.rdata[1] = static_cast<uint8_t>((addr.s_addr >> 8) & 0xFF);
+      answer.rdata[2] = static_cast<uint8_t>((addr.s_addr >> 16) & 0xFF);
+      answer.rdata[3] = static_cast<uint8_t>((addr.s_addr >> 24) & 0xFF);
+
+      answers.push_back(answer);
+
+      break;
     }
 
-    struct in_addr addr;
-    if (inet_pton(AF_INET, record.value.data(), &addr) != 1)
-      return;
-
-    answer.rdlength = sizeof(addr);
-    answer.rdata[0] = static_cast<uint8_t>(addr.s_addr & 0xFF);
-    answer.rdata[1] = static_cast<uint8_t>((addr.s_addr >> 8) & 0xFF);
-    answer.rdata[2] = static_cast<uint8_t>((addr.s_addr >> 16) & 0xFF);
-    answer.rdata[3] = static_cast<uint8_t>((addr.s_addr >> 24) & 0xFF);
-
-    answers.push_back(answer);
+    default:
+      break;
   }
 }
 
